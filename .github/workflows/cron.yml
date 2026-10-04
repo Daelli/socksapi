@@ -23,6 +23,9 @@ jobs:
             - name: install dependencies
               run: go mod tidy
 
+            - name: set ulimit
+              run: ulimit -n 65535
+
             - name: run job
               run: go run .
 
