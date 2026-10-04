@@ -9,7 +9,7 @@ type LIMITER struct {
 
 func NewLimiter() *LIMITER {
 	return &LIMITER{
-		pool: make(chan struct{}, 100),
+		pool: make(chan struct{}, 50),
 	}
 }
 

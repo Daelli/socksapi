@@ -22,8 +22,8 @@ func GEO(socks5 string) (string, error) {
 
 	transport := &http.Transport{
 		Proxy:               http.ProxyURL(proxy),
-		MaxIdleConns:        200,
-		MaxIdleConnsPerHost: 100,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 50,
 		IdleConnTimeout:     90 * time.Second,
 		TLSHandshakeTimeout: 5 * time.Second,
 		DialContext: (&net.Dialer{
