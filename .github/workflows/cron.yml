@@ -1,0 +1,41 @@
+name: cron
+
+on:
+    schedule:
+        - cron: '0 * * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    cron:
+        runs-on: ubuntu-latest
+        steps:
+            - name: checkout
+              uses: actions/checkout@main
+
+            - name: setup go
+              uses: actions/setup-go@main
+              with:
+                  go-version: '1.25.12'
+
+            - name: install dependencies
+              run: go mod tidy
+
+            - name: run job
+              run: go run .
+
+            - name: get time
+              run: echo "RUN_TIME=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
+
+            - name: write last run time
+              run: echo "${{ env.RUN_TIME }}" > last_run_time.txt
+
+            - name: commit and push changes
+              run: |
+                  git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --local user.name "github-actions[bot]"
+                  git add .
+                  git commit -m "${{ env.RUN_TIME }}"
+                  git push
