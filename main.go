@@ -24,6 +24,7 @@ func main() {
 		}
 
 		defer resp.Body.Close()
+
 		f, err := os.Create(P("raw.txt"))
 		if err != nil {
 			log.Fatalln(err)
@@ -42,7 +43,7 @@ func main() {
 			log.Println("process", proxy)
 
 			return func() {
-				country, err := GEO(S5(proxy))
+				country, err := GEO(proxy)
 				if err != nil {
 					return
 				}

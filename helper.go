@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,15 +14,14 @@ func P(path string) string {
 	return filepath.Join("data", path)
 }
 
-func S5(socks5 string) *http.Client {
+func GEO(socks5 string) (string, error) {
 	proxy, err := url.Parse(socks5)
 	if err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
 
 	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxy),
-
+		Proxy:               http.ProxyURL(proxy),
 		TLSHandshakeTimeout: 5 * time.Second,
 		DialContext: (&net.Dialer{
 			Timeout:   5 * time.Second,
@@ -31,22 +29,24 @@ func S5(socks5 string) *http.Client {
 		}).DialContext,
 	}
 
-	return &http.Client{
-		Transport: transport,
-	}
-}
+	defer transport.CloseIdleConnections()
 
-func GEO(client *http.Client) (string, error) {
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
+	}
+
 	resp, err := client.Get("http://ip-api.com/json")
 	if err != nil {
 		return "", err
 	}
 
+	defer resp.Body.Close()
+
 	var result struct {
 		CountryCode string `json:"countryCode"`
 	}
 
-	defer resp.Body.Close()
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
