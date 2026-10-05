@@ -39,7 +39,7 @@ func GEO(socks5 string) (string, error) {
 		Timeout:   30 * time.Second,
 	}
 
-	resp, err := client.Get("http://ip-api.com/json")
+	resp, err := client.Get("https://api.ip.sb/geoip")
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +47,7 @@ func GEO(socks5 string) (string, error) {
 	defer resp.Body.Close()
 
 	var result struct {
-		CountryCode string `json:"countryCode"`
+		CountryCode string `json:"country_code"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
