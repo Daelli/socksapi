@@ -8,6 +8,7 @@ import (
 
 type DataMgr struct {
 	canuse *os.File
+	all    *os.File
 	fis    map[string]*os.File
 	lock   sync.Mutex
 }
@@ -26,14 +27,21 @@ func NewDataMgr() *DataMgr {
 		log.Fatalln(err)
 	}
 
+	all, err := os.Create(P("all.txt"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	return &DataMgr{
 		canuse: canuse,
+		all:    all,
 		fis:    map[string]*os.File{},
 	}
 }
 
 func (dm *DataMgr) Close() {
 	dm.canuse.Close()
+	dm.all.Close()
 	for _, fi := range dm.fis {
 		fi.Close()
 	}
@@ -54,4 +62,5 @@ func (dm *DataMgr) Add(country, proxy string) {
 
 	dm.canuse.WriteString(proxy + "\n")
 	dm.fis[country].WriteString(proxy + "\n")
+	dm.all.WriteString(country + "|" + proxy + "\n")
 }
