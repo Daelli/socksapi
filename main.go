@@ -7,32 +7,93 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
+// 多个候选源，任一挂掉不影响整体；全部以 socks5://ip:port 归一化后去重
+var SOURCES = []string{
+	"https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/socks5/data.txt",
+	"https://cdn.jsdelivr.net/gh/TheSpeedX/PROXY-List@master/socks5.txt",
+	"https://cdn.jsdelivr.net/gh/ALIILAPRO/Proxy@main/socks5.txt",
+	"https://cdn.jsdelivr.net/gh/monosans/proxy-list@main/proxies/socks5.txt",
+	"https://cdn.jsdelivr.net/gh/Zaeem20/FREE_PROXIES_LIST@master/socks5.txt",
+}
+
 var RAW_DATA = bytes.NewBuffer(nil)
+
+func normalize(line string) string {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return ""
+	}
+	if !strings.Contains(line, "://") {
+		line = "socks5://" + line
+	}
+	if !strings.HasPrefix(line, "socks5://") {
+		return ""
+	}
+	hostport := strings.TrimPrefix(line, "socks5://")
+	if strings.Count(hostport, ":") < 1 {
+		return ""
+	}
+	return "socks5://" + hostport
+}
 
 func main() {
 	datamgr := NewDataMgr()
 	defer datamgr.Close()
 
-	func() {
-		log.Println("fetch raw data")
+	seen := map[string]bool{}
+	total := 0
 
-		resp, err := http.Get("https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/socks5/data.txt")
-		if err != nil {
-			log.Fatalln(err)
-		}
+	for _, src := range SOURCES {
+		func() {
+			log.Println("fetch", src)
 
-		defer resp.Body.Close()
+			resp, err := http.Get(src)
+			if err != nil {
+				log.Println("skip source:", err)
+				return
+			}
 
-		f, err := os.Create(P("raw.txt"))
-		if err != nil {
-			log.Fatalln(err)
-		}
+			defer resp.Body.Close()
 
-		defer f.Close()
-		io.Copy(io.MultiWriter(f, RAW_DATA), resp.Body)
-	}()
+			if resp.StatusCode != http.StatusOK {
+				log.Println("skip source: http", resp.StatusCode)
+				return
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Println("skip source: read", err)
+				return
+			}
+
+			if !rawWritten {
+				rawWritten = true
+				f, err := os.Create(P("raw.txt"))
+				if err != nil {
+					log.Fatalln(err)
+				}
+				defer f.Close()
+				f.Write(body)
+			}
+
+			s := bufio.NewScanner(bytes.NewReader(body))
+			s.Buffer(make([]byte, 1024*1024), 1024*1024)
+			for s.Scan() {
+				proxy := normalize(s.Text())
+				if proxy == "" || seen[proxy] {
+					continue
+				}
+				seen[proxy] = true
+				total++
+				RAW_DATA.WriteString(proxy + "\n")
+			}
+		}()
+	}
+
+	log.Println("candidates:", total)
 
 	limiter := NewLimiter()
 	defer limiter.Wait()

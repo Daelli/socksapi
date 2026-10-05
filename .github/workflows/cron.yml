@@ -2,23 +2,30 @@ name: cron
 
 on:
     schedule:
+        # 注意：GitHub 不执行 fork 上的 schedule 触发器，这一条在本仓库是装饰。
+        # 实际拉起跑的是 workflow_dispatch（由 s5.861996.xyz 的 Worker Cron Trigger 每 3 小时调一次）。
         - cron: '0 */3 * * *'
     workflow_dispatch:
 
 permissions:
     contents: write
 
+concurrency:
+    group: cron
+    cancel-in-progress: false
+
 jobs:
     cron:
         runs-on: ubuntu-latest
+        timeout-minutes: 50
         steps:
             - name: checkout
-              uses: actions/checkout@main
+              uses: actions/checkout@v4
 
             - name: setup go
-              uses: actions/setup-go@main
+              uses: actions/setup-go@v5
               with:
-                  go-version: '1.25.12'
+                  go-version: '1.25'
 
             - name: install dependencies
               run: go mod tidy
@@ -40,5 +47,5 @@ jobs:
                   git config --local user.email "github-actions[bot]@users.noreply.github.com"
                   git config --local user.name "github-actions[bot]"
                   git add .
-                  git commit -m "${{ env.RUN_TIME }}"
+                  git commit -m "${{ env.RUN_TIME }}" || echo "nothing to commit"
                   git push
