@@ -14,27 +14,40 @@ concurrency:
     group: cron
     cancel-in-progress: false
 
+# 上游 runoneall/free-socks5-proxy-api 自己带 schedule 且在真的跑（不是 fork），
+# 所以这里不再重复扫一遍全网：只把它按国家分好的 socks5 池镜像过来当兜底源。
+# 上游改了路径或被删时，已提交的文件保持不动——宁可用旧数据，也不把兜底源清空。
 jobs:
-    cron:
-        runs-on: ubuntu-latest
-        timeout-minutes: 50
+    mirror:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 10
         steps:
             - name: checkout
               uses: actions/checkout@v4
 
-            - name: setup go
-              uses: actions/setup-go@v5
-              with:
-                  go-version: '1.25'
+            - name: mirror per-country pools
+              run: |
+                  set -e
+                  mkdir -p data
+                  for cc in HK TW JP KR SG US DE RU; do
+                      url="https://cdn.jsdelivr.net/gh/runoneall/free-socks5-proxy-api@main/data/$cc.txt"
+                      if curl -fsSL --max-time 60 "$url" -o "/tmp/$cc.txt" && [ -s "/tmp/$cc.txt" ]; then
+                          mv "/tmp/$cc.txt" "data/$cc.txt"
+                          echo "$cc  $(wc -l < "data/$cc.txt") 条"
+                      else
+                          echo "$cc  上游取不到，保留现有文件"
+                      fi
+                  done
 
-            - name: install dependencies
-              run: go mod tidy
-
-            - name: set ulimit
-              run: ulimit -n 65535
-
-            - name: run job
-              run: go run .
+            - name: rebuild all.txt
+              run: |
+                  set -e
+                  : > data/all.txt
+                  for cc in HK TW JP KR SG US DE RU; do
+                      [ -s "data/$cc.txt" ] || continue
+                      awk -v c="$cc" '/socks5:\/\// { print c "|" $0 }' "data/$cc.txt" >> data/all.txt
+                  done
+                  wc -l data/all.txt
 
             - name: get time
               run: echo "RUN_TIME=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
@@ -46,6 +59,6 @@ jobs:
               run: |
                   git config --local user.email "github-actions[bot]@users.noreply.github.com"
                   git config --local user.name "github-actions[bot]"
-                  git add .
+                  git add data last_run_time.txt
                   git commit -m "${{ env.RUN_TIME }}" || echo "nothing to commit"
                   git push

@@ -21,6 +21,9 @@ var SOURCES = []string{
 
 var RAW_DATA = bytes.NewBuffer(nil)
 
+// 只保留第一个源的原始清单，免得 raw.txt 被后面的源覆盖
+var rawWritten bool
+
 func normalize(line string) string {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
